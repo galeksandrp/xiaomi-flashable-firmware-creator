@@ -1,0 +1,49 @@
+# This workflow will install Python dependencies, run tests and lint with a single version of Python
+# For more information see: https://docs.github.com/en/actions/automating-builds-and-tests/building-and-testing-python
+
+name: Python application
+
+on:
+  push
+
+permissions:
+  contents: read
+
+jobs:
+  build:
+    strategy:
+      matrix:
+        forrecovery:
+          - "https://bn.d.miui.com/OS1.0.3.0.UNHRUXM/miui_SAPPHIRENRUGlobal_OS1.0.3.0.UNHRUXM_d295f2f94c_14.0.zip"
+          - "https://bn.d.miui.com/OS1.0.2.0.UNHRUXM/miui_SAPPHIRENRUGlobal_OS1.0.2.0.UNHRUXM_1e3350df68_14.0.zip"
+          - "https://bn.d.miui.com/OS1.0.1.0.UNHRUXM/miui_SAPPHIRENRUGlobal_OS1.0.1.0.UNHRUXM_988a587097_14.0.zip"
+          - "https://bn.d.miui.com/V14.0.7.0.TNHRUXM/miui_SAPPHIRENRUGlobal_V14.0.7.0.TNHRUXM_e9c095a828_13.0.zip"
+          - "https://bn.d.miui.com/V14.0.6.0.TNHRUXM/miui_SAPPHIRENRUGlobal_V14.0.6.0.TNHRUXM_c8da74a8fd_13.0.zip"
+          - "https://bn.d.miui.com/V14.0.3.0.TNHRUXM/miui_SAPPHIRENRUGlobal_V14.0.3.0.TNHRUXM_6f52c587b4_13.0.zip"
+          - "https://bn.d.miui.com/V14.0.1.0.TNHRUXM/miui_SAPPHIRENRUGlobal_V14.0.1.0.TNHRUXM_2362c06399_13.0.zip"
+
+    runs-on: ubuntu-latest
+
+    steps:
+    - uses: actions/checkout@v4
+    - name: Set up Python 3.10
+      uses: actions/setup-python@v3
+      with:
+        python-version: "3.10"
+    - run: pip install xiaomi_flashable_firmware_creator
+    - run: mkdir -p custom/firmware
+
+    - run: wget "${{ matrix.forrecovery }}"
+      working-directory: custom
+    - run: xiaomi_flashable_firmware_creator -F custom/*.zip -o custom/firmware
+    - run: rm -rf custom/*.zip
+
+    - run: echo "FIRMWARE_NAME=$(basename custom/firmware/fw_* .zip)" >> $GITHUB_ENV
+    - run: mkdir -p "custom/firmware/$FIRMWARE_NAME"
+    - run: unzip custom/firmware/*.zip -d "custom/firmware/$FIRMWARE_NAME"
+    - run: rm -rf custom/firmware/*.zip
+
+    - uses: actions/upload-artifact@v4
+      with:
+        name: ${{ env.FIRMWARE_NAME }}
+        path: custom/firmware/${{ env.FIRMWARE_NAME }}
