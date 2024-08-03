@@ -1,0 +1,73 @@
+# This workflow will install Python dependencies, run tests and lint with a single version of Python
+# For more information see: https://docs.github.com/en/actions/automating-builds-and-tests/building-and-testing-python
+
+name: Python application
+
+on:
+  push
+
+permissions:
+  contents: write
+
+jobs:
+  build:
+    strategy:
+      matrix:
+        forrecovery:
+          - "https://bn.d.miui.com/OS1.0.3.0.UNHRUXM/miui_SAPPHIRENRUGlobal_OS1.0.3.0.UNHRUXM_d295f2f94c_14.0.zip"
+          - "https://bn.d.miui.com/OS1.0.2.0.UNHRUXM/miui_SAPPHIRENRUGlobal_OS1.0.2.0.UNHRUXM_1e3350df68_14.0.zip"
+          - "https://bn.d.miui.com/OS1.0.1.0.UNHRUXM/miui_SAPPHIRENRUGlobal_OS1.0.1.0.UNHRUXM_988a587097_14.0.zip"
+          - "https://bn.d.miui.com/V14.0.7.0.TNHRUXM/miui_SAPPHIRENRUGlobal_V14.0.7.0.TNHRUXM_e9c095a828_13.0.zip"
+          - "https://bn.d.miui.com/V14.0.6.0.TNHRUXM/miui_SAPPHIRENRUGlobal_V14.0.6.0.TNHRUXM_c8da74a8fd_13.0.zip"
+          - "https://bn.d.miui.com/V14.0.3.0.TNHRUXM/miui_SAPPHIRENRUGlobal_V14.0.3.0.TNHRUXM_6f52c587b4_13.0.zip"
+          - "https://bn.d.miui.com/V14.0.1.0.TNHRUXM/miui_SAPPHIRENRUGlobal_V14.0.1.0.TNHRUXM_2362c06399_13.0.zip"
+
+    runs-on: ubuntu-latest
+
+    steps:
+    - uses: actions/checkout@v4
+    - name: Set up Python 3.10
+      uses: actions/setup-python@v3
+      with:
+        python-version: "3.10"
+    - run: pip install xiaomi_flashable_firmware_creator
+    - run: mkdir -p custom/firmware
+
+    - run: wget "${{ matrix.forrecovery }}"
+      working-directory: custom
+    - run: xiaomi_flashable_firmware_creator -F custom/*.zip -o custom/firmware
+    - run: rm -rf custom/*.zip
+
+    - run: echo "FIRMWARE_NAME=$(basename custom/firmware/*.zip)" >> $GITHUB_ENV
+    - uses: actions/checkout@v4
+      with:
+        path: custom/firmware/repo
+    - run: git checkout --orphan custom-branch
+      working-directory: custom/firmware/repo
+    - run: git reset --hard
+      working-directory: custom/firmware/repo
+    - run: git clean -fd
+      working-directory: custom/firmware/repo
+
+    - run: unzip custom/firmware/*.zip -d "custom/firmware/package"
+    - run: rm -rf custom/firmware/*.zip
+
+    - run: git config --global user.email "3586205+galeksandrp@users.noreply.github.com"
+    - run: git config --global user.name "Alexander Georgievskiy"
+
+    - run: sha256sum firmware-update/* > sha256sum.txt
+      working-directory: custom/firmware/package
+    - run: mv custom/firmware/package/sha256sum.txt custom/firmware/repo
+    - run: git add .
+      working-directory: custom/firmware/repo
+    - run: GIT_COMMITTER_DATE='946684800' git commit --date "946684800 +0000" -m "$FIRMWARE_NAME"
+      working-directory: custom/firmware/repo
+    - run: git tag "$FIRMWARE_NAME"
+      working-directory: custom/firmware/repo
+    - run: git push origin "$FIRMWARE_NAME"
+      working-directory: custom/firmware/repo
+
+    - uses: actions/upload-artifact@v4
+      with:
+        name: ${{ env.FIRMWARE_NAME }}
+        path: custom/firmware/repo
